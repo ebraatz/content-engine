@@ -1,8 +1,10 @@
 # digest.py
 import os
+import sqlite3
 import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime
+from pathlib import Path
 from anthropic import Anthropic
 from dotenv import load_dotenv
 
@@ -10,7 +12,9 @@ from feeds import fetch_feeds
 
 load_dotenv()
 
-SYSTEM_PROMPT = """You are a content strategist for Eric Braatz — pharma ops and quality
+DB_PATH = Path(__file__).parent / "content_engine.db"
+
+SYSTEM_PROMPT_TEMPLATE = """You are a content strategist for Eric Braatz — pharma ops and quality
 practitioner, 20 years GMP manufacturing, DEA compliance specialist,
 AI skeptic-optimist. Building a LinkedIn thought leadership presence
 at the intersection of pharma operations and AI.
@@ -20,28 +24,10 @@ from today's signals.
 
 For each signal, identify:
 1. Which of these patterns it connects to (pick the closest):
-   - Foundation Fallacy: tools deployed on broken foundations
-   - Knowledge Exodus: institutional knowledge walking out the door
-   - Chesterton's Fence: removing rules without understanding why they exist
-   - Validation Theater: compliance designed for auditors not operators
-   - Regulator Moves First: FDA ahead of the industry it regulates
-   - Seam Problem: compliance failures at system interfaces
-   - Human Faculty Atrophy: skills degrading from disuse
-   - Architecture Lie: RAG sold as something smarter
-   - Same Pattern Different Decade: current AI wave rhymes with Six Sigma
-   - Pipeline Gap: discovery accelerated, ops unchanged
-   - SME Credibility Premium: insider knowledge vs outside commentary
-   - Measurement Trap: optimizing metrics not outcomes
+{patterns}
 
 2. Which named story from Eric's library is the best match:
-   - Floppy Disk Sampling Plan
-   - Six Sigma Pilgrimage
-   - Elsa Deployed Anyway
-   - SMR Workflow
-   - DEA Database That Never Shipped
-   - Bob (recurring character)
-   - Phone Number Problem
-   - CAPA Board
+{stories}
 
 3. One suggested hook line in Eric's voice — punchy, specific, no corporate language
 
@@ -49,6 +35,26 @@ If nothing today is genuinely interesting, respond with:
 WEAK DAY. Best signal: [headline]. Pattern: [closest match]. Skip recommended.
 
 RECENT PATTERNS USED: [leave blank for now — we will update weekly]"""
+
+
+def load_library_context():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+
+    patterns = conn.execute("SELECT name, description FROM patterns ORDER BY id").fetchall()
+    stories = conn.execute("SELECT name FROM stories ORDER BY id").fetchall()
+
+    conn.close()
+
+    patterns_str = "\n".join(f"   - {r['name']}: {r['description']}" for r in patterns)
+    stories_str = "\n".join(f"   - {r['name']}" for r in stories)
+
+    return patterns_str, stories_str
+
+
+def build_system_prompt():
+    patterns_str, stories_str = load_library_context()
+    return SYSTEM_PROMPT_TEMPLATE.format(patterns=patterns_str, stories=stories_str)
 
 
 def build_prompt(articles):
@@ -75,7 +81,7 @@ def run_digest():
     message = client.messages.create(
         model="claude-opus-4-6",
         max_tokens=1024,
-        system=SYSTEM_PROMPT,
+        system=build_system_prompt(),
         messages=[{"role": "user", "content": prompt}],
     )
 
