@@ -54,8 +54,36 @@
       <span class="capture-date">{{ item.created_at[:16]|replace("T", " ") }}</span>
     </div>
     <div class="capture-content">{{ item.content }}</div>
+    {% if item.enrichment_data %}
+    <div class="enrichment">
+      <div class="enrichment-row">
+        <span class="enrich-label">Summary</span>
+        <span>{{ item.enrichment_data.summary }}</span>
+      </div>
+      <div class="enrichment-row">
+        <span class="enrich-label">Insight</span>
+        <span>{{ item.enrichment_data.key_insight }}</span>
+      </div>
+      <div class="enrichment-row">
+        <span class="enrich-label">Category</span>
+        <span class="tag tag-source">{{ item.enrichment_data.suggested_category }}</span>
+      </div>
+      {% if item.enrichment_data.matched_patterns %}
+      <div class="enrichment-row">
+        <span class="enrich-label">Patterns</span>
+        <span>{{ item.enrichment_data.matched_patterns | join(", ") }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
     <div class="capture-actions">
-      <form method="POST" action="{{ url_for('capture_dismiss', idx=item.id) }}">
+      {% if not item.enrichment_data %}
+      <form method="POST" action="{{ url_for('capture_enrich', idx=item.id) }}" style="display:inline;">
+        <button type="submit" class="btn-card btn-enrich">Enrich</button>
+      </form>
+      {% endif %}
+      <form method="POST" action="{{ url_for('capture_dismiss', idx=item.id) }}" style="display:inline;">
         <button type="submit" class="btn-card btn-dismiss">Dismiss</button>
       </form>
     </div>
@@ -108,6 +136,43 @@
   }
 
   .btn-dismiss:hover { background: #eaeaea; color: #333; }
+
+  .btn-enrich {
+    background: #f0f7ff;
+    color: #2c5f8a;
+    border-color: #c8d8ee;
+  }
+
+  .btn-enrich:hover { background: #dce8f8; }
+
+  .enrichment {
+    background: #f8fafb;
+    border: 1px solid #e0eaf2;
+    border-radius: 4px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+  }
+
+  .enrichment-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 8px;
+    line-height: 1.5;
+  }
+
+  .enrichment-row:last-child { margin-bottom: 0; }
+
+  .enrich-label {
+    font-weight: bold;
+    color: #888;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    min-width: 70px;
+    padding-top: 2px;
+  }
 
   .tag-source {
     background: #f0f4f8;

@@ -1,7 +1,16 @@
 # app.py
+import json
+import os
 import sqlite3
+import urllib.request
+import urllib.error
+from html.parser import HTMLParser
 from pathlib import Path
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from anthropic import Anthropic
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = "content-engine-local"
@@ -14,6 +23,33 @@ def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+class _TextExtractor(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self._parts = []
+        self._skip = False
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style", "nav", "header", "footer"):
+            self._skip = True
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style", "nav", "header", "footer"):
+            self._skip = False
+
+    def handle_data(self, data):
+        if not self._skip:
+            text = data.strip()
+            if text:
+                self._parts.append(text)
+
+
+def _extract_text(html):
+    parser = _TextExtractor()
+    parser.feed(html)
+    return " ".join(parser._parts)
 
 
 @app.route("/")
@@ -151,10 +187,23 @@ def capture():
         return redirect(url_for("capture"))
 
     conn = get_db()
-    inbox = conn.execute(
+    rows = conn.execute(
         "SELECT * FROM captures WHERE processed = 0 ORDER BY created_at DESC"
     ).fetchall()
     conn.close()
+
+    inbox = []
+    for row in rows:
+        item = dict(row)
+        if item.get("enrichment"):
+            try:
+                item["enrichment_data"] = json.loads(item["enrichment"])
+            except json.JSONDecodeError:
+                item["enrichment_data"] = None
+        else:
+            item["enrichment_data"] = None
+        inbox.append(item)
+
     return render_template("capture.html", inbox=inbox, sources=CAPTURE_SOURCES)
 
 
@@ -165,6 +214,102 @@ def capture_dismiss(idx):
     conn.commit()
     conn.close()
     flash("Dismissed.", "success")
+    return redirect(url_for("capture"))
+
+
+@app.route("/capture/enrich/<int:idx>", methods=["POST"])
+def capture_enrich(idx):
+    conn = get_db()
+    capture = conn.execute("SELECT * FROM captures WHERE id = ?", (idx,)).fetchone()
+
+    if capture is None:
+        conn.close()
+        flash("Capture not found.", "error")
+        return redirect(url_for("capture"))
+
+    content = capture["content"].strip()
+    url = content.split("\n")[0].strip()
+
+    if url.startswith("http"):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                html = resp.read().decode("utf-8", errors="ignore")
+            page_text = _extract_text(html)[:4000]
+        except urllib.error.URLError as e:
+            conn.close()
+            flash(f"Could not fetch URL: {e.reason}", "error")
+            return redirect(url_for("capture"))
+    else:
+        page_text = content[:4000]
+
+    category = capture["category"] or "content"
+
+    lens_instructions = {
+        "content": (
+            "Apply the pharma practitioner lens. Emphasize regulatory patterns, compliance gaps, "
+            "and manufacturing reality. What does someone with 20 years on the floor see here "
+            "that an outsider would miss?"
+        ),
+        "signal": (
+            "Apply the early signal detector + systems thinker lens. Look for cross-domain patterns "
+            "and what this rhymes with in other industries. Separate what is actually new from what "
+            "is hype. What does this signal about where things are heading?"
+        ),
+        "strategy": (
+            "Apply the empire builder lens. Focus on business model implications and build vs buy vs "
+            "ignore decisions. How does this affect a bootstrapped consulting and content business "
+            "at the intersection of pharma ops and AI?"
+        ),
+        "learning": (
+            "Apply the curious generalist lens. What mental model does this build or refine? "
+            "What changes about how to think after absorbing this? Focus on transferable insight."
+        ),
+    }
+    lens = lens_instructions.get(category, lens_instructions["content"])
+
+    patterns = conn.execute("SELECT name, description FROM patterns ORDER BY id").fetchall()
+    patterns_list = "\n".join(f"- {r['name']}: {r['description']}" for r in patterns)
+
+    prompt = f"""{"URL: " + url if url.startswith("http") else "Capture:"}
+
+Content:
+{page_text}
+
+Lens: {lens}
+
+Pattern library:
+{patterns_list}
+
+Return a JSON object with exactly these fields:
+- summary: 2-3 sentence summary of the content
+- suggested_category: one of content, strategy, learning, signal
+- matched_patterns: list of pattern names from the library that apply (can be empty list)
+- key_insight: one sentence capturing the most useful insight
+
+Return only valid JSON, no other text."""
+
+    client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    message = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=512,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    enrichment_raw = message.content[0].text.strip().strip("`").removeprefix("json").strip()
+
+    try:
+        json.loads(enrichment_raw)
+    except json.JSONDecodeError:
+        conn.close()
+        flash("Enrichment failed — Claude returned unexpected output.", "error")
+        return redirect(url_for("capture"))
+
+    conn.execute("UPDATE captures SET enrichment = ? WHERE id = ?", (enrichment_raw, idx))
+    conn.commit()
+    conn.close()
+
+    flash("Enriched.", "success")
     return redirect(url_for("capture"))
 
 
@@ -192,4 +337,4 @@ def api_capture():
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5001, debug=True)
