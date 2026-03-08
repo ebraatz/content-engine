@@ -1,1 +1,73 @@
-{}
+{
+  "patterns": [
+    {"name": "Foundation Fallacy", "description": "Tools deployed on broken foundations. The pattern where organizations buy the capability before building the infrastructure that makes it work. AI, Six Sigma, ERP — same mistake, different decade. The tool amplifies whatever is underneath it. If the foundation is broken, the tool breaks faster and more expensively."},
+    {"name": "Knowledge Exodus", "description": "Institutional knowledge walking out the door with the people who hold it. Not just relationships and expertise — the silent logic embedded in every procedure nobody had to explain because everyone just knew. When the person leaves, what remains is the what with no why."},
+    {"name": "Chesterton's Fence", "description": "Removing rules and processes without understanding why they existed. New people come in with good intentions and fresh ideas, see something that looks arbitrary, and take it down. The guardrail had a reason. Now you'll find out what it was."},
+    {"name": "Validation Theater", "description": "Compliance designed to satisfy auditors rather than actually control the process. The documentation takes longer than the process runtime. The procedure exists because someone once asked for it, not because it prevents anything. Looks right on paper, hollow underneath."},
+    {"name": "Regulator Moves First", "description": "FDA ahead of the industry it regulates. The agency that requires validation before AI touches a submission deployed a hallucinating AI assistant anyway — ahead of schedule, under budget, humans in the loop. Your governance committee is still picking a meeting time."},
+    {"name": "Seam Problem", "description": "Compliance failures at the interfaces between systems, regulations, or kingdoms. The transdermal patch isn't just a drug and isn't just a device — it's one thing. Change one part without proving you haven't changed the other and you find out where the seam is via a Warning Letter."},
+    {"name": "Human Faculty Atrophy", "description": "Skills degrading from disuse when tools get good enough that using the skill stops mattering. Not a decision — a gradual drift. Phone numbers, navigation, now judgment calls in deviation investigations. The pattern is not new. The cost of atrophy depends entirely on what the skill was for."},
+    {"name": "Architecture Lie", "description": "RAG sold as something smarter. Most enterprise QMS AI features launched in the last 18 months are Tier 1 — document search — dressed up as Tier 2 — structured query with reasoning. Finds text that looks related. No guarantee it found what you actually asked for. The gap between what it claims and what it delivers is where the data integrity risk lives."},
+    {"name": "Same Pattern Different Decade", "description": "The current AI wave rhymes with Six Sigma, ERP, and every prior technology wave in pharma. The tools change. The mistake doesn't. Skip the foundation, install the capability, get the theater. Recognize the pattern early enough and you can either get ahead of it or at least not be surprised."},
+    {"name": "Pipeline Gap", "description": "Discovery accelerated by AI, operations unchanged. AI-designed molecules are clearing preclinical faster than ever. Phase III still takes years. Manufacturing scale-up still requires validated processes and documented controls that don't care how elegantly the molecule was designed. The front end has a rocket ship. The back end is still driving the speed limit."},
+    {"name": "SME Credibility Premium", "description": "Insider knowledge versus outside commentary. The person who has sat across from an FDA inspector, signed a batch record, managed a DEA vault, and watched a process fail in real time carries a different kind of authority than someone who read the guidance document. The practitioner voice is rare on LinkedIn. That's the gap."},
+    {"name": "Measurement Trap", "description": "Optimizing metrics instead of outcomes. Tie rewards to output numbers and the incentive finds the path around the guardrail. Production goes up. So do deviations. You get exactly what you measured. The measurement becomes the game."}
+  ],
+  "stories": [
+    {
+      "name": "Floppy Disk Sampling Plan",
+      "description": "Traced a sampling parameter used in a live regulated procedure back through SOP revision history, through older systems, to a floppy-disk calculator from the 1990s — a company nobody remembered, math that was probably defensible but couldn't be explained. The people who understood it had already retired. What remained was the what with no why. Illustrates Knowledge Exodus, Chesterton's Fence, and the case for RAG. Deploy when writing about undocumented legacy decisions, institutional archaeology, or AI-assisted knowledge retrieval."
+    },
+    {
+      "name": "Six Sigma Pilgrimage",
+      "description": "Watched pharma make the pilgrimage to Toyota, come back with kanban boards and 5S posters, hire Black Belts, launch continuous improvement initiatives — and get continuous theater instead. Toyota won because of clean data, disciplined processes, and workers empowered to stop the line. The tools were the result of that foundation, not a substitute for it. Exact same mistake now playing out with AI at 10x speed. Illustrates Foundation Fallacy and Same Pattern Different Decade. Deploy when writing about AI adoption failures, process improvement theater, or systems thinking."
+    },
+    {
+      "name": "Elsa Deployed Anyway",
+      "description": "The FDA launched an AI assistant agency-wide in June 2025 — built on Claude, uses RAG — after staff confirmed on record it was hallucinating. Deployed anyway. Ahead of schedule, under budget, humans in the loop. The same agency that requires industry to validate AI before it touches a submission watched it fail in real time and iterated in production. Illustrates Regulator Moves First and Validation Theater. Deploy when writing about AI governance, pharma risk aversion, or the FDA's actual posture on AI."
+    },
+    {
+      "name": "SMR Workflow",
+      "description": "Designed a Single-Minute Reconciliation workflow for drug substance accounting that reduced end-of-shift downtime by 350% and changeover downtime by 377%. Built because the existing process was broken and nobody had named it clearly enough to fix it. Framework was adopted as the site standard. Illustrates SME Credibility Premium and Foundation Fallacy. Deploy when writing about operational problem-solving, process design, or proof that practitioner-built solutions stick."
+    },
+    {
+      "name": "DEA Database That Never Shipped",
+      "description": "Identified a critical gap in DEA inventory management infrastructure, built a URS and working prototype for an automated system, presented to IT leadership as a build-vs-buy investment case. The prototype had the right architecture — dual-registration ledger, role-based views, transfer state management. The project didn't ship. Decision: not pursuing further — work-related, not passion-driven. Illustrates Architecture Lie and the difference between identifying the right solution and being the one to build it. Deploy when writing about enterprise AI readiness or the gap between knowing what's needed and building it."
+    },
+    {
+      "name": "Bob",
+      "description": "Recurring character representing any experienced operator walking out the door with 30 years of undocumented knowledge. Bob is not one person — Bob is the pattern. He's the guy who knows why that procedure was written that way in 2003. He's retiring next quarter. Nobody has asked him what he knows that nobody else does. Illustrates Knowledge Exodus and Chesterton's Fence. Deploy as a callback or anchor character whenever writing about institutional memory, knowledge transfer, or AI as a capture mechanism."
+    },
+    {
+      "name": "Phone Number Problem",
+      "description": "Used to know a dozen phone numbers by heart. Now knows three. Used to navigate by landmarks. Now panics if the phone dies on the freeway. Didn't decide to forget — the tool got good enough that remembering stopped mattering. The skill atrophied from disuse without a single conscious choice. Illustrates Human Faculty Atrophy. Deploy as the accessible on-ramp before pivoting to the higher-stakes version of the same pattern in regulated manufacturing."
+    },
+    {
+      "name": "CAPA Board",
+      "description": "Led site-wide evolution of CAPA business processes to align with global QMS standards. Implemented CAPA Board and MRB, improving cycle times 24% and compliance 67%. Built something that actually changed behavior, not just documentation. The difference between a CAPA system that closes tickets and one that eliminates root causes is the same difference as between compliance theater and operational control. Illustrates Validation Theater and SME Credibility Premium. Deploy when writing about QMS infrastructure, quality culture, or proof of practitioner-built systems that stuck."
+    }
+  ],
+  "identity": [
+    {
+      "name": "20-Year GMP Practitioner",
+      "description": "Two decades inside pharmaceutical manufacturing and quality systems — not advising from the outside, but running production lines, signing batch records, managing DEA registrations, sitting across from FDA inspectors. When writing about what's broken, it's from having watched it break from the inside."
+    },
+    {
+      "name": "DEA Compliance Operator",
+      "description": "Chain of custody isn't abstract — it's real-time reconciliation, zero-tolerance discrepancy, federal scrutiny, and the accountability that develops when the consequence of being wrong is a criminal referral. That lens changes how compliance, data integrity, and audit trails look versus what they look like on paper."
+    },
+    {
+      "name": "Recovering from the Wrong Container",
+      "description": "High-intensity person who spent most of a career in a low-intensity container. Knows what it looks like when systems don't match the people inside them — because of being that person. That's not a liability. It's why organizational dysfunction that others have adapted to is still visible."
+    },
+    {
+      "name": "Early Signal Detector",
+      "description": "Drawn to the moment before consensus. Crypto before mainstream. AI before every keynote. The illegible thing before it becomes infrastructure. Loses interest once something becomes conventional wisdom. Writing about AI in pharma now, not in two years when everyone else is doing it."
+    },
+    {
+      "name": "Builder Who Ships",
+      "description": "Built things that stuck around — a reconciliation workflow still used years later, a DEA training program from scratch, a working inventory prototype, a content engine, a live SOP tool. Not theorizing about systems. Building them, running them, finding out what breaks."
+    }
+  ],
+  "log": []
+}

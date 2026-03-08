@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Pattern Library{% endblock %}
+
+{% macro entry_card(entry, entry_type, idx) %}
+  <div class="card">
+    <div class="card-body">
+      <div class="name">{{ entry.name }}</div>
+      {% if entry.description %}
+        <div class="desc">{{ entry.description }}</div>
+      {% else %}
+        <div class="desc empty">No description</div>
+      {% endif %}
+    </div>
+    <div class="card-actions">
+      <a href="{{ url_for('edit', entry_type=entry_type, idx=idx) }}" class="btn-card btn-edit">Edit</a>
+      <form method="POST" action="{{ url_for('delete', entry_type=entry_type, idx=idx) }}"
+            onsubmit="return confirm('Delete \'{{ entry.name }}\'? This cannot be undone.')">
+        <button type="submit" class="btn-card btn-delete">Delete</button>
+      </form>
+    </div>
+  </div>
+{% endmacro %}
+
+{% block content %}
+<h1>Pattern Library</h1>
+<p class="subtitle">
+  {{ library.patterns|length }} patterns &middot;
+  {{ library.stories|length }} stories &middot;
+  {{ library.identity|length }} identity dimensions
+</p>
+
+<!-- Patterns -->
+<div class="section">
+  <div class="section-header">
+    <h2>Patterns</h2>
+    <span class="count">{{ library.patterns|length }}</span>
+  </div>
+  {% if library.patterns %}
+    <div class="card-grid">
+      {% for entry in library.patterns %}
+        {{ entry_card(entry, "pattern", entry.id) }}
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="empty-state">No patterns yet. <a href="{{ url_for('add') }}">Add one.</a></p>
+  {% endif %}
+</div>
+
+<!-- Stories -->
+<div class="section">
+  <div class="section-header">
+    <h2>Stories</h2>
+    <span class="count">{{ library.stories|length }}</span>
+  </div>
+  {% if library.stories %}
+    <div class="card-grid">
+      {% for entry in library.stories %}
+        {{ entry_card(entry, "story", entry.id) }}
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="empty-state">No stories yet. <a href="{{ url_for('add') }}">Add one.</a></p>
+  {% endif %}
+</div>
+
+<!-- Identity -->
+<div class="section">
+  <div class="section-header">
+    <h2>Identity Dimensions</h2>
+    <span class="count">{{ library.identity|length }}</span>
+  </div>
+  {% if library.identity %}
+    <div class="card-grid">
+      {% for entry in library.identity %}
+        {{ entry_card(entry, "identity", entry.id) }}
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="empty-state">No identity dimensions yet. <a href="{{ url_for('add') }}">Add one.</a></p>
+  {% endif %}
+</div>
+
+<!-- Log -->
+{% if recent_log %}
+<div class="section">
+  <div class="section-header">
+    <h2>Recent Additions</h2>
+    <span class="count">{{ library.log|length }} total</span>
+  </div>
+  <table class="log-table">
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>Type</th>
+        <th>Action</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in recent_log %}
+        <tr>
+          <td>{{ entry.timestamp[:19]|replace("T", " ") }}</td>
+          <td><span class="tag tag-{{ entry.type }}">{{ entry.type }}</span></td>
+          <td>{{ entry.get("action", "add") }}</td>
+          <td>{{ entry.name }}</td>
+          <td>{{ entry.description or "—" }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% endblock %}

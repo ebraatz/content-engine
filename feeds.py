@@ -15,6 +15,17 @@ KEYWORDS = [
     "biotech", "DEA", "manufacturing", "compliance", "clinical", "regulatory",
 ]
 
+ARXIV_FEED_URLS = [
+    "https://rss.arxiv.org/rss/cs.AI",
+    "https://rss.arxiv.org/rss/cs.CY",
+]
+
+ARXIV_KEYWORDS = [
+    "pharma", "FDA", "GMP", "DEA", "compliance", "validation",
+    "agentic", "regulated", "manufacturing", "quality",
+]
+
+
 def is_recent(entry, hours=24):
     for attr in ("published_parsed", "updated_parsed"):
         t = getattr(entry, attr, None)
@@ -23,29 +34,38 @@ def is_recent(entry, hours=24):
             return datetime.now(timezone.utc) - published <= timedelta(hours=hours)
     return False
 
-def is_relevant(entry):
+
+def is_relevant(entry, keywords):
     text = f"{entry.get('title', '')} {entry.get('summary', '')}".lower()
-    return any(kw.lower() in text for kw in KEYWORDS)
+    return any(kw.lower() in text for kw in keywords)
+
+
+def fetch_feed(url, keywords, hours=24):
+    articles = []
+    try:
+        feed = feedparser.parse(url)
+        source = feed.feed.get("title", url)
+        for entry in feed.entries:
+            if not is_recent(entry, hours=hours):
+                continue
+            if not is_relevant(entry, keywords):
+                continue
+            articles.append({
+                "title": entry.get("title", "").strip(),
+                "summary": entry.get("summary", "").strip(),
+                "url": entry.get("link", ""),
+                "source": source,
+                "published": entry.get("published", entry.get("updated", "")),
+            })
+    except Exception as e:
+        print(f"[feeds] Skipping {url}: {e}")
+    return articles
+
 
 def fetch_feeds():
     articles = []
     for url in FEED_URLS:
-        try:
-            feed = feedparser.parse(url)
-            source = feed.feed.get("title", url)
-            for entry in feed.entries:
-                if not is_recent(entry):
-                    continue
-                if not is_relevant(entry):
-                    continue
-                articles.append({
-                    "title": entry.get("title", "").strip(),
-                    "summary": entry.get("summary", "").strip(),
-                    "url": entry.get("link", ""),
-                    "source": source,
-                    "published": entry.get("published", entry.get("updated", "")),
-                })
-        except Exception as e:
-            print(f"[feeds] Skipping {url}: {e}")
-            continue
+        articles.extend(fetch_feed(url, KEYWORDS, hours=24))
+    for url in ARXIV_FEED_URLS:
+        articles.extend(fetch_feed(url, ARXIV_KEYWORDS, hours=48))
     return articles

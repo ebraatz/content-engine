@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Capture Inbox{% endblock %}
+
+{% block content %}
+<h1>Capture Inbox</h1>
+<p class="subtitle">{{ inbox|length }} unprocessed item{{ 's' if inbox|length != 1 }}</p>
+
+<div class="form-card" style="margin-bottom: 44px;">
+  <form method="POST" action="{{ url_for('capture') }}">
+
+    <div class="form-group">
+      <label for="content">Capture</label>
+      <textarea name="content" id="content" rows="3"
+                placeholder="Paste a quote, observation, idea, or link..."></textarea>
+    </div>
+
+    <div class="form-group">
+      <label for="source">Source</label>
+      <select name="source" id="source">
+        {% for s in sources %}
+          <option value="{{ s }}">{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <button type="submit" class="btn">Capture</button>
+    </div>
+
+  </form>
+</div>
+
+{% if inbox %}
+<div class="section">
+  <div class="section-header">
+    <h2>Inbox</h2>
+    <span class="count">{{ inbox|length }}</span>
+  </div>
+
+  {% for item in inbox %}
+  <div class="capture-item">
+    <div class="capture-meta">
+      <span class="tag tag-source">{{ item.source }}</span>
+      <span class="capture-date">{{ item.created_at[:16]|replace("T", " ") }}</span>
+    </div>
+    <div class="capture-content">{{ item.content }}</div>
+    <div class="capture-actions">
+      <form method="POST" action="{{ url_for('capture_dismiss', idx=item.id) }}">
+        <button type="submit" class="btn-card btn-dismiss">Dismiss</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="empty-state">Inbox is clear.</p>
+{% endif %}
+
+<style>
+  .capture-item {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+  }
+
+  .capture-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .capture-date {
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    color: #aaa;
+  }
+
+  .capture-content {
+    font-size: 15px;
+    line-height: 1.6;
+    color: #1a1a2e;
+    margin-bottom: 14px;
+    white-space: pre-wrap;
+  }
+
+  .capture-actions {
+    padding-top: 10px;
+    border-top: 1px solid #f0f0f0;
+  }
+
+  .btn-dismiss {
+    background: #f5f5f5;
+    color: #666;
+    border-color: #ddd;
+  }
+
+  .btn-dismiss:hover { background: #eaeaea; color: #333; }
+
+  .tag-source {
+    background: #f0f4f8;
+    color: #4a6fa5;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-family: Arial, sans-serif;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+</style>
+{% endblock %}
