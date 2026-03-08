@@ -121,7 +121,7 @@ def add():
     return render_template("add.html")
 
 
-CAPTURE_SOURCES = ["other", "twitter", "linkedin", "newsletter", "book", "conversation", "web"]
+CAPTURE_SOURCES = ["other", "x", "linkedin", "newsletter", "book", "conversation", "web", "claude"]
 
 
 @app.route("/capture", methods=["GET", "POST"])
@@ -129,17 +129,20 @@ def capture():
     if request.method == "POST":
         content = request.form.get("content", "").strip()
         source = request.form.get("source", "other").strip()
+        category = request.form.get("category", "content").strip()
 
         if not content:
             flash("Content is required.", "error")
             return redirect(url_for("capture"))
         if source not in CAPTURE_SOURCES:
             source = "other"
+        if category not in ("content", "strategy", "learning", "signal"):
+            category = "content"
 
         conn = get_db()
         conn.execute(
-            "INSERT INTO captures (content, source) VALUES (?, ?)",
-            (content, source),
+            "INSERT INTO captures (content, source, category) VALUES (?, ?, ?)",
+            (content, source, category),
         )
         conn.commit()
         conn.close()
