@@ -3,7 +3,7 @@
 
 {% block content %}
 <h1>Capture Inbox</h1>
-<p class="subtitle">{{ inbox|length }} unprocessed item{{ 's' if inbox|length != 1 }}</p>
+<p class="subtitle">{{ unread_count }} unread &middot; {{ inbox|length }} total</p>
 
 <div class="form-card" style="margin-bottom: 44px;">
   <form method="POST" action="{{ url_for('capture') }}">
@@ -48,7 +48,7 @@
   </div>
 
   {% for item in inbox %}
-  <div class="capture-item">
+  <div class="capture-item {{ 'capture-item--read' if item.processed }}">
     <div class="capture-meta">
       <span class="tag tag-source">{{ item.source }}</span>
       <span class="capture-date">{{ item.created_at[:16]|replace("T", " ") }}</span>
@@ -78,11 +78,19 @@
     {% endif %}
 
     <div class="capture-actions">
+      <a href="{{ url_for('capture_edit', idx=item.id) }}" class="btn-card btn-edit">Edit</a>
+      <a href="{{ url_for('capture_draft', idx=item.id) }}" class="btn-card btn-draft">Draft Post</a>
+      <a href="{{ url_for('capture_promote', idx=item.id) }}" class="btn-card btn-promote">Promote</a>
       {% if not item.enrichment_data %}
       <form method="POST" action="{{ url_for('capture_enrich', idx=item.id) }}" style="display:inline;">
         <button type="submit" class="btn-card btn-enrich">Enrich</button>
       </form>
       {% endif %}
+      <form method="POST" action="{{ url_for('capture_toggle', idx=item.id) }}" style="display:inline;">
+        <button type="submit" class="btn-card btn-toggle">
+          {{ 'Mark Unread' if item.processed else 'Mark Read' }}
+        </button>
+      </form>
       <form method="POST" action="{{ url_for('capture_dismiss', idx=item.id) }}" style="display:inline;">
         <button type="submit" class="btn-card btn-dismiss">Dismiss</button>
       </form>
@@ -137,6 +145,22 @@
 
   .btn-dismiss:hover { background: #eaeaea; color: #333; }
 
+  .btn-toggle {
+    background: #f5f5f5;
+    color: #888;
+    border-color: #ddd;
+  }
+
+  .btn-toggle:hover { background: #eaeaea; color: #444; }
+
+  .capture-item--read {
+    opacity: 0.45;
+  }
+
+  .capture-item--read:hover {
+    opacity: 0.75;
+  }
+
   .btn-enrich {
     background: #f0f7ff;
     color: #2c5f8a;
@@ -144,6 +168,22 @@
   }
 
   .btn-enrich:hover { background: #dce8f8; }
+
+  .btn-draft {
+    background: #f3f0ff;
+    color: #5c35a8;
+    border-color: #d4c8f5;
+  }
+
+  .btn-draft:hover { background: #e8e0ff; }
+
+  .btn-promote {
+    background: #f0faf3;
+    color: #2e7d32;
+    border-color: #c2e0c6;
+  }
+
+  .btn-promote:hover { background: #dff2e3; }
 
   .enrichment {
     background: #f8fafb;

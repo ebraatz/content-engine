@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Edit Capture{% endblock %}
+
+{% block content %}
+<h1>Edit Capture</h1>
+<p class="subtitle">Source: {{ capture.source }} &middot; {{ capture.created_at[:10] }}</p>
+
+<div class="form-card">
+  <form method="POST" action="{{ url_for('capture_edit', idx=capture.id) }}">
+
+    <div class="form-group">
+      <label for="content">Content</label>
+      <textarea name="content" id="content" rows="6">{{ capture.content }}</textarea>
+    </div>
+
+    <div class="form-group">
+      <label for="category">Category</label>
+      <select name="category" id="category">
+        {% for cat in ("content", "strategy", "learning", "signal") %}
+          <option value="{{ cat }}" {{ 'selected' if capture.category == cat }}>{{ cat }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <button type="submit" class="btn">Save</button>
+      <a href="{{ url_for('capture') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+
+  </form>
+</div>
+{% endblock %}

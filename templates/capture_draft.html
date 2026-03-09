@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Draft Post{% endblock %}
+
+{% block content %}
+<h1>Draft Post</h1>
+<p class="subtitle">{{ capture.source }} &middot; {{ capture.created_at[:10] }}</p>
+
+<div class="draft-workspace">
+
+  <!-- Left: context panel -->
+  <div class="context-panel">
+
+    <div class="context-section">
+      <div class="context-label">Capture</div>
+      <div class="context-text">{{ capture.content }}</div>
+    </div>
+
+    {% if capture.enrichment_data %}
+    <div class="context-section">
+      <div class="context-label">Summary</div>
+      <div class="context-text">{{ capture.enrichment_data.summary }}</div>
+    </div>
+
+    <div class="context-section">
+      <div class="context-label">Insight</div>
+      <div class="context-text">{{ capture.enrichment_data.key_insight }}</div>
+    </div>
+
+    {% if capture.enrichment_data.matched_patterns %}
+    <div class="context-section">
+      <div class="context-label">Matched Patterns</div>
+      <div class="context-text">{{ capture.enrichment_data.matched_patterns | join(", ") }}</div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="context-section">
+      <div class="context-text empty">No enrichment yet. Return to inbox and click Enrich.</div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Right: draft form -->
+  <div class="draft-panel">
+    <form method="POST" action="{{ url_for('capture_draft', idx=capture.id) }}">
+
+      <div class="form-group">
+        <label for="angle">Angle</label>
+        <input type="text" name="angle" id="angle"
+               placeholder="What's the take?"
+               value="{{ draft.angle if draft else '' }}">
+      </div>
+
+      <div class="form-group">
+        <label for="hook">Hook Candidate</label>
+        <input type="text" name="hook" id="hook"
+               placeholder="Opening line..."
+               value="{{ draft.hook if draft else '' }}">
+      </div>
+
+      <div class="form-group">
+        <label for="pattern_connection">Pattern / Story Connection</label>
+        <select name="pattern_connection" id="pattern_connection">
+          <option value="">— none —</option>
+          {% for p in patterns %}
+            <option value="{{ p.name }}"
+              {{ 'selected' if draft and draft.pattern_connection == p.name }}>
+              {{ p.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="notes">Notes</label>
+        <textarea name="notes" id="notes" rows="3"
+                  placeholder="Anything else...">{{ draft.notes if draft else '' }}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="full_draft">Full Draft</label>
+        <textarea name="full_draft" id="full_draft" rows="10"
+                  placeholder="Write the post here...">{{ draft.full_draft if draft else '' }}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="post_id">Link to Post</label>
+        <select name="post_id" id="post_id">
+          <option value="">— not linked —</option>
+          {% for post in posts %}
+            <option value="{{ post.id }}"
+              {{ 'selected' if post.id in linked_post_ids }}>
+              {{ '✓ ' if post.id in linked_post_ids }}{{ post.title }} ({{ post.published_date }})
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <button type="submit" class="btn">Save Draft</button>
+        <a href="{{ url_for('capture') }}" class="btn btn-secondary">← Inbox</a>
+      </div>
+
+    </form>
+  </div>
+
+</div>
+
+<style>
+  .draft-workspace {
+    display: grid;
+    grid-template-columns: 1fr 1.6fr;
+    gap: 28px;
+    align-items: start;
+  }
+
+  .context-panel {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+    padding: 20px 22px;
+  }
+
+  .context-section {
+    margin-bottom: 18px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .context-section:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  .context-label {
+    font-family: Arial, sans-serif;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #aaa;
+    margin-bottom: 6px;
+  }
+
+  .context-text {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #333;
+    white-space: pre-wrap;
+  }
+
+  .context-text.empty {
+    color: #bbb;
+    font-style: italic;
+    font-size: 13px;
+  }
+
+  .draft-panel {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+    padding: 24px 26px;
+  }
+
+  .draft-panel textarea#full_draft {
+    min-height: 220px;
+  }
+</style>
+{% endblock %}

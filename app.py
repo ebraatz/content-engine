@@ -188,7 +188,7 @@ def capture():
 
     conn = get_db()
     rows = conn.execute(
-        "SELECT * FROM captures WHERE processed = 0 ORDER BY created_at DESC"
+        "SELECT * FROM captures ORDER BY processed ASC, created_at DESC"
     ).fetchall()
     conn.close()
 
@@ -204,7 +204,149 @@ def capture():
             item["enrichment_data"] = None
         inbox.append(item)
 
-    return render_template("capture.html", inbox=inbox, sources=CAPTURE_SOURCES)
+    unread_count = sum(1 for item in inbox if not item["processed"])
+    return render_template("capture.html", inbox=inbox, sources=CAPTURE_SOURCES, unread_count=unread_count)
+
+
+@app.route("/capture/draft/<int:idx>", methods=["GET", "POST"])
+def capture_draft(idx):
+    conn = get_db()
+    capture = conn.execute("SELECT * FROM captures WHERE id = ?", (idx,)).fetchone()
+
+    if capture is None:
+        conn.close()
+        flash("Capture not found.", "error")
+        return redirect(url_for("capture"))
+
+    if request.method == "POST":
+        draft_data = {
+            "angle":              request.form.get("angle", "").strip(),
+            "hook":               request.form.get("hook", "").strip(),
+            "pattern_connection": request.form.get("pattern_connection", "").strip(),
+            "notes":              request.form.get("notes", "").strip(),
+            "full_draft":         request.form.get("full_draft", "").strip(),
+        }
+        post_id = request.form.get("post_id", "").strip()
+
+        conn.execute(
+            "UPDATE captures SET draft = ? WHERE id = ?",
+            (json.dumps(draft_data), idx)
+        )
+
+        if post_id:
+            exists = conn.execute(
+                "SELECT 1 FROM post_captures WHERE post_id = ? AND capture_id = ?",
+                (int(post_id), idx)
+            ).fetchone()
+            if not exists:
+                conn.execute(
+                    "INSERT INTO post_captures (post_id, capture_id) VALUES (?, ?)",
+                    (int(post_id), idx)
+                )
+
+        conn.commit()
+        conn.close()
+        flash("Draft saved.", "success")
+        return redirect(url_for("capture_draft", idx=idx))
+
+    item = dict(capture)
+    if item.get("enrichment"):
+        try:
+            item["enrichment_data"] = json.loads(item["enrichment"])
+        except json.JSONDecodeError:
+            item["enrichment_data"] = None
+    else:
+        item["enrichment_data"] = None
+
+    draft = None
+    if item.get("draft"):
+        try:
+            draft = json.loads(item["draft"])
+        except json.JSONDecodeError:
+            draft = None
+
+    patterns = conn.execute("SELECT name FROM patterns ORDER BY id").fetchall()
+    posts = conn.execute(
+        "SELECT id, title, published_date FROM posts ORDER BY published_date DESC"
+    ).fetchall()
+    linked_post_ids = {r["post_id"] for r in conn.execute(
+        "SELECT post_id FROM post_captures WHERE capture_id = ?", (idx,)
+    ).fetchall()}
+
+    conn.close()
+    return render_template(
+        "capture_draft.html",
+        capture=item,
+        draft=draft,
+        patterns=patterns,
+        posts=posts,
+        linked_post_ids=linked_post_ids,
+    )
+
+
+@app.route("/capture/promote/<int:idx>", methods=["GET", "POST"])
+def capture_promote(idx):
+    conn = get_db()
+    capture = conn.execute("SELECT * FROM captures WHERE id = ?", (idx,)).fetchone()
+
+    if capture is None:
+        conn.close()
+        flash("Capture not found.", "error")
+        return redirect(url_for("capture"))
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        entry_type = request.form.get("type", "").strip().lower()
+        description = request.form.get("description", "").strip()
+
+        if not name:
+            flash("Name is required.", "error")
+            return redirect(url_for("capture_promote", idx=idx))
+        if entry_type not in TYPE_TABLES:
+            flash("Invalid type.", "error")
+            return redirect(url_for("capture_promote", idx=idx))
+
+        table = TYPE_TABLES[entry_type]
+        conn.execute(
+            f"INSERT INTO {table} (name, description) VALUES (?, ?)",
+            (name, description)
+        )
+        conn.commit()
+        conn.close()
+
+        flash(f'Added {entry_type}: "{name}" to library.', "success")
+        return redirect(url_for("capture"))
+
+    prefill_name = ""
+    prefill_description = ""
+    if capture["enrichment"]:
+        try:
+            enrichment = json.loads(capture["enrichment"])
+            suggestion = enrichment.get("promote_suggestion") or {}
+            prefill_name = suggestion.get("name", "")
+            prefill_description = suggestion.get("description", "") or enrichment.get("key_insight", "")
+        except json.JSONDecodeError:
+            pass
+
+    conn.close()
+    return render_template("capture_promote.html", capture=capture,
+                           prefill_name=prefill_name,
+                           prefill_description=prefill_description)
+
+
+@app.route("/capture/toggle/<int:idx>", methods=["POST"])
+def capture_toggle(idx):
+    conn = get_db()
+    capture = conn.execute("SELECT processed FROM captures WHERE id = ?", (idx,)).fetchone()
+    if capture is None:
+        conn.close()
+        flash("Capture not found.", "error")
+        return redirect(url_for("capture"))
+    new_state = 0 if capture["processed"] else 1
+    conn.execute("UPDATE captures SET processed = ? WHERE id = ?", (new_state, idx))
+    conn.commit()
+    conn.close()
+    return redirect(url_for("capture"))
 
 
 @app.route("/capture/dismiss/<int:idx>", methods=["POST"])
@@ -215,6 +357,40 @@ def capture_dismiss(idx):
     conn.close()
     flash("Dismissed.", "success")
     return redirect(url_for("capture"))
+
+
+@app.route("/capture/edit/<int:idx>", methods=["GET", "POST"])
+def capture_edit(idx):
+    conn = get_db()
+    capture = conn.execute("SELECT * FROM captures WHERE id = ?", (idx,)).fetchone()
+
+    if capture is None:
+        conn.close()
+        flash("Capture not found.", "error")
+        return redirect(url_for("capture"))
+
+    if request.method == "POST":
+        content = request.form.get("content", "").strip()
+        category = request.form.get("category", "content").strip()
+
+        if not content:
+            conn.close()
+            flash("Content is required.", "error")
+            return redirect(url_for("capture_edit", idx=idx))
+        if category not in ("content", "strategy", "learning", "signal"):
+            category = "content"
+
+        conn.execute(
+            "UPDATE captures SET content = ?, category = ? WHERE id = ?",
+            (content, category, idx),
+        )
+        conn.commit()
+        conn.close()
+        flash("Capture updated.", "success")
+        return redirect(url_for("capture"))
+
+    conn.close()
+    return render_template("capture_edit.html", capture=capture)
 
 
 @app.route("/capture/enrich/<int:idx>", methods=["POST"])
@@ -284,8 +460,12 @@ Pattern library:
 Return a JSON object with exactly these fields:
 - summary: 2-3 sentence summary of the content
 - suggested_category: one of content, strategy, learning, signal
-- matched_patterns: list of pattern names from the library that apply (can be empty list)
+- matched_patterns: identify the ONE or TWO most strongly matched patterns and explain specifically why each one fits. Be selective — only include a pattern if the fit is strong and specific, not just loosely related. Format as a list of strings: ["Pattern Name: reason it fits", ...]. Can be empty list if nothing fits well.
 - key_insight: one sentence capturing the most useful insight
+- promote_suggestion: an object with these fields:
+    - action: either "match" (fits an existing pattern) or "new" (suggest a new one)
+    - name: the matching pattern name if action is "match", or a proposed new pattern name if action is "new"
+    - description: if action is "match", one sentence on why this capture fits that pattern; if action is "new", a full description of the proposed pattern written in a direct, practitioner voice — specific, not generic
 
 Return only valid JSON, no other text."""
 
