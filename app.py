@@ -6,7 +6,7 @@ import urllib.request
 import urllib.error
 from html.parser import HTMLParser
 from pathlib import Path
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response, stream_with_context
 from anthropic import Anthropic
 from dotenv import load_dotenv
 
@@ -219,31 +219,14 @@ def capture_draft(idx):
         return redirect(url_for("capture"))
 
     if request.method == "POST":
-        draft_data = {
-            "angle":              request.form.get("angle", "").strip(),
-            "hook":               request.form.get("hook", "").strip(),
-            "pattern_connection": request.form.get("pattern_connection", "").strip(),
-            "notes":              request.form.get("notes", "").strip(),
-            "full_draft":         request.form.get("full_draft", "").strip(),
-        }
-        post_id = request.form.get("post_id", "").strip()
-
+        full_draft = request.form.get("full_draft", "").strip()
+        status = request.form.get("status", "idea").strip()
+        if status not in ("idea", "drafted", "stress_tested", "verified", "published"):
+            status = "idea"
         conn.execute(
-            "UPDATE captures SET draft = ? WHERE id = ?",
-            (json.dumps(draft_data), idx)
+            "UPDATE captures SET draft = ?, status = ? WHERE id = ?",
+            (full_draft, status, idx)
         )
-
-        if post_id:
-            exists = conn.execute(
-                "SELECT 1 FROM post_captures WHERE post_id = ? AND capture_id = ?",
-                (int(post_id), idx)
-            ).fetchone()
-            if not exists:
-                conn.execute(
-                    "INSERT INTO post_captures (post_id, capture_id) VALUES (?, ?)",
-                    (int(post_id), idx)
-                )
-
         conn.commit()
         conn.close()
         flash("Draft saved.", "success")
@@ -258,30 +241,15 @@ def capture_draft(idx):
     else:
         item["enrichment_data"] = None
 
-    draft = None
+    existing_draft = ""
     if item.get("draft"):
         try:
-            draft = json.loads(item["draft"])
-        except json.JSONDecodeError:
-            draft = None
-
-    patterns = conn.execute("SELECT name FROM patterns ORDER BY id").fetchall()
-    posts = conn.execute(
-        "SELECT id, title, published_date FROM posts ORDER BY published_date DESC"
-    ).fetchall()
-    linked_post_ids = {r["post_id"] for r in conn.execute(
-        "SELECT post_id FROM post_captures WHERE capture_id = ?", (idx,)
-    ).fetchall()}
+            existing_draft = json.loads(item["draft"]).get("full_draft", "")
+        except (json.JSONDecodeError, AttributeError):
+            existing_draft = item["draft"]
 
     conn.close()
-    return render_template(
-        "capture_draft.html",
-        capture=item,
-        draft=draft,
-        patterns=patterns,
-        posts=posts,
-        linked_post_ids=linked_post_ids,
-    )
+    return render_template("capture_draft.html", capture=item, existing_draft=existing_draft)
 
 
 @app.route("/capture/promote/<int:idx>", methods=["GET", "POST"])
@@ -332,6 +300,18 @@ def capture_promote(idx):
     return render_template("capture_promote.html", capture=capture,
                            prefill_name=prefill_name,
                            prefill_description=prefill_description)
+
+
+@app.route("/capture/status/<int:idx>", methods=["POST"])
+def capture_status(idx):
+    status = request.form.get("status", "idea").strip()
+    if status not in ("idea", "drafted", "stress_tested", "verified", "published"):
+        status = "idea"
+    conn = get_db()
+    conn.execute("UPDATE captures SET status = ? WHERE id = ?", (status, idx))
+    conn.commit()
+    conn.close()
+    return redirect(url_for("capture"))
 
 
 @app.route("/capture/toggle/<int:idx>", methods=["POST"])
@@ -393,61 +373,29 @@ def capture_edit(idx):
     return render_template("capture_edit.html", capture=capture)
 
 
-@app.route("/capture/enrich/<int:idx>", methods=["POST"])
-def capture_enrich(idx):
-    conn = get_db()
-    capture = conn.execute("SELECT * FROM captures WHERE id = ?", (idx,)).fetchone()
+LENS_INSTRUCTIONS = {
+    "content": (
+        "Apply the pharma practitioner lens. Emphasize regulatory patterns, compliance gaps, "
+        "and manufacturing reality. What does someone with 20 years on the floor see here "
+        "that an outsider would miss?"
+    ),
+    "signal": (
+        "Apply the early signal detector + systems thinker lens. Look for cross-domain patterns "
+        "and what this rhymes with in other industries. Separate what is actually new from what "
+        "is hype. What does this signal about where things are heading?"
+    ),
+    "strategy": (
+        "Apply the empire builder lens. Focus on business model implications and build vs buy vs "
+        "ignore decisions. How does this affect a bootstrapped consulting and content business "
+        "at the intersection of pharma ops and AI?"
+    ),
+    "learning": (
+        "Apply the curious generalist lens. What mental model does this build or refine? "
+        "What changes about how to think after absorbing this? Focus on transferable insight."
+    ),
+}
 
-    if capture is None:
-        conn.close()
-        flash("Capture not found.", "error")
-        return redirect(url_for("capture"))
-
-    content = capture["content"].strip()
-    url = content.split("\n")[0].strip()
-
-    if url.startswith("http"):
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                html = resp.read().decode("utf-8", errors="ignore")
-            page_text = _extract_text(html)[:4000]
-        except urllib.error.URLError as e:
-            conn.close()
-            flash(f"Could not fetch URL: {e.reason}", "error")
-            return redirect(url_for("capture"))
-    else:
-        page_text = content[:4000]
-
-    category = capture["category"] or "content"
-
-    lens_instructions = {
-        "content": (
-            "Apply the pharma practitioner lens. Emphasize regulatory patterns, compliance gaps, "
-            "and manufacturing reality. What does someone with 20 years on the floor see here "
-            "that an outsider would miss?"
-        ),
-        "signal": (
-            "Apply the early signal detector + systems thinker lens. Look for cross-domain patterns "
-            "and what this rhymes with in other industries. Separate what is actually new from what "
-            "is hype. What does this signal about where things are heading?"
-        ),
-        "strategy": (
-            "Apply the empire builder lens. Focus on business model implications and build vs buy vs "
-            "ignore decisions. How does this affect a bootstrapped consulting and content business "
-            "at the intersection of pharma ops and AI?"
-        ),
-        "learning": (
-            "Apply the curious generalist lens. What mental model does this build or refine? "
-            "What changes about how to think after absorbing this? Focus on transferable insight."
-        ),
-    }
-    lens = lens_instructions.get(category, lens_instructions["content"])
-
-    patterns = conn.execute("SELECT name, description FROM patterns ORDER BY id").fetchall()
-    patterns_list = "\n".join(f"- {r['name']}: {r['description']}" for r in patterns)
-
-    prompt = f"""{"URL: " + url if url.startswith("http") else "Capture:"}
+ENRICH_PROMPT_TEMPLATE = """{header}
 
 Content:
 {page_text}
@@ -469,6 +417,43 @@ Return a JSON object with exactly these fields:
 
 Return only valid JSON, no other text."""
 
+
+def _enrich_capture(idx):
+    """Enrich a single capture by id. Returns (True, None) on success or (False, error_msg)."""
+    conn = get_db()
+    capture = conn.execute("SELECT * FROM captures WHERE id = ?", (idx,)).fetchone()
+    if capture is None:
+        conn.close()
+        return False, "Capture not found"
+
+    content = capture["content"].strip()
+    url = content.split("\n")[0].strip()
+
+    if url.startswith("http"):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                html = resp.read().decode("utf-8", errors="ignore")
+            page_text = _extract_text(html)[:4000]
+        except urllib.error.URLError as e:
+            conn.close()
+            return False, f"Could not fetch URL: {e.reason}"
+    else:
+        page_text = content[:4000]
+
+    category = capture["category"] or "content"
+    lens = LENS_INSTRUCTIONS.get(category, LENS_INSTRUCTIONS["content"])
+
+    patterns = conn.execute("SELECT name, description FROM patterns ORDER BY id").fetchall()
+    patterns_list = "\n".join(f"- {r['name']}: {r['description']}" for r in patterns)
+
+    prompt = ENRICH_PROMPT_TEMPLATE.format(
+        header="URL: " + url if url.startswith("http") else "Capture:",
+        page_text=page_text,
+        lens=lens,
+        patterns_list=patterns_list,
+    )
+
     client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     message = client.messages.create(
         model="claude-haiku-4-5-20251001",
@@ -482,15 +467,45 @@ Return only valid JSON, no other text."""
         json.loads(enrichment_raw)
     except json.JSONDecodeError:
         conn.close()
-        flash("Enrichment failed — Claude returned unexpected output.", "error")
-        return redirect(url_for("capture"))
+        return False, "Claude returned unexpected output"
 
     conn.execute("UPDATE captures SET enrichment = ? WHERE id = ?", (enrichment_raw, idx))
     conn.commit()
     conn.close()
+    return True, None
 
-    flash("Enriched.", "success")
+
+@app.route("/capture/enrich/<int:idx>", methods=["POST"])
+def capture_enrich(idx):
+    success, err = _enrich_capture(idx)
+    if success:
+        flash("Enriched.", "success")
+    else:
+        flash(f"Enrichment failed — {err}", "error")
     return redirect(url_for("capture"))
+
+
+@app.route("/capture/enrich-all")
+def capture_enrich_all():
+    def generate():
+        conn = get_db()
+        pending = conn.execute(
+            "SELECT id FROM captures WHERE enrichment IS NULL AND processed = 0"
+        ).fetchall()
+        conn.close()
+
+        total = len(pending)
+        if total == 0:
+            yield "data: Nothing to enrich.\n\n"
+            return
+
+        for i, row in enumerate(pending, 1):
+            yield f"data: Enriching {i} of {total}...\n\n"
+            _enrich_capture(row["id"])
+
+        yield "data: done\n\n"
+
+    return Response(stream_with_context(generate()), content_type="text/event-stream")
 
 
 @app.route("/api/capture", methods=["POST"])
@@ -514,6 +529,36 @@ def api_capture():
     conn.close()
 
     return jsonify({"id": capture_id, "content": content, "source": source}), 201
+
+
+@app.route("/dashboard")
+def dashboard():
+    conn = get_db()
+
+    # Library
+    pattern_count  = conn.execute("SELECT COUNT(*) FROM patterns").fetchone()[0]
+    story_count    = conn.execute("SELECT COUNT(*) FROM stories").fetchone()[0]
+    identity_count = conn.execute("SELECT COUNT(*) FROM identity").fetchone()[0]
+    recent_pattern = conn.execute("SELECT name FROM patterns ORDER BY id DESC LIMIT 1").fetchone()
+    recent_story   = conn.execute("SELECT name FROM stories ORDER BY id DESC LIMIT 1").fetchone()
+
+    # Captures
+    total_captures = conn.execute("SELECT COUNT(*) FROM captures").fetchone()[0]
+    unread_count   = conn.execute("SELECT COUNT(*) FROM captures WHERE processed = 0").fetchone()[0]
+    enriched_count = conn.execute("SELECT COUNT(*) FROM captures WHERE enrichment IS NOT NULL").fetchone()[0]
+    draft_count    = conn.execute("SELECT COUNT(*) FROM captures WHERE draft IS NOT NULL AND draft != ''").fetchone()[0]
+    by_category    = conn.execute("SELECT COALESCE(category,'other'), COUNT(*) FROM captures GROUP BY category ORDER BY 2 DESC").fetchall()
+    by_status      = conn.execute("SELECT COALESCE(status,'idea'), COUNT(*) FROM captures GROUP BY status ORDER BY 2 DESC").fetchall()
+
+    # Posts
+    total_posts       = conn.execute("SELECT COUNT(*) FROM posts").fetchone()[0]
+    total_impressions = conn.execute("SELECT COALESCE(SUM(impressions),0) FROM posts").fetchone()[0]
+    avg_impressions   = round(total_impressions / total_posts) if total_posts else 0
+    best_post         = conn.execute("SELECT hook, title, impressions FROM posts ORDER BY impressions DESC LIMIT 1").fetchone()
+    posts             = conn.execute("SELECT * FROM posts ORDER BY impressions DESC").fetchall()
+
+    conn.close()
+    return render_template("dashboard.html", **locals())
 
 
 if __name__ == "__main__":

@@ -297,6 +297,7 @@
     <nav>
       <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}">Library</a>
       <a href="{{ url_for('capture') }}" class="{{ 'active' if request.endpoint in ('capture', 'capture_dismiss') }}">Capture</a>
+      <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">Dashboard</a>
       <a href="{{ url_for('add') }}" class="{{ 'active' if request.endpoint == 'add' }}">+ Add Entry</a>
     </nav>
   </header>

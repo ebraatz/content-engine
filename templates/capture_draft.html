@@ -9,6 +9,7 @@
 
   <!-- Left: context panel -->
   <div class="context-panel">
+    <button type="button" class="btn-copy" onclick="copyContext()">Copy All</button>
 
     <div class="context-section">
       <div class="context-label">Capture</div>
@@ -29,7 +30,7 @@
     {% if capture.enrichment_data.matched_patterns %}
     <div class="context-section">
       <div class="context-label">Matched Patterns</div>
-      <div class="context-text">{{ capture.enrichment_data.matched_patterns | join(", ") }}</div>
+      <div class="context-text">{{ capture.enrichment_data.matched_patterns | join("\n") }}</div>
     </div>
     {% endif %}
 
@@ -41,58 +42,21 @@
 
   </div>
 
-  <!-- Right: draft form -->
+  <!-- Right: draft -->
   <div class="draft-panel">
     <form method="POST" action="{{ url_for('capture_draft', idx=capture.id) }}">
 
       <div class="form-group">
-        <label for="angle">Angle</label>
-        <input type="text" name="angle" id="angle"
-               placeholder="What's the take?"
-               value="{{ draft.angle if draft else '' }}">
-      </div>
-
-      <div class="form-group">
-        <label for="hook">Hook Candidate</label>
-        <input type="text" name="hook" id="hook"
-               placeholder="Opening line..."
-               value="{{ draft.hook if draft else '' }}">
-      </div>
-
-      <div class="form-group">
-        <label for="pattern_connection">Pattern / Story Connection</label>
-        <select name="pattern_connection" id="pattern_connection">
-          <option value="">— none —</option>
-          {% for p in patterns %}
-            <option value="{{ p.name }}"
-              {{ 'selected' if draft and draft.pattern_connection == p.name }}>
-              {{ p.name }}
-            </option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label for="notes">Notes</label>
-        <textarea name="notes" id="notes" rows="3"
-                  placeholder="Anything else...">{{ draft.notes if draft else '' }}</textarea>
-      </div>
-
-      <div class="form-group">
         <label for="full_draft">Full Draft</label>
-        <textarea name="full_draft" id="full_draft" rows="10"
-                  placeholder="Write the post here...">{{ draft.full_draft if draft else '' }}</textarea>
+        <textarea name="full_draft" id="full_draft" rows="18"
+                  placeholder="Paste or write the post here...">{{ existing_draft }}</textarea>
       </div>
 
       <div class="form-group">
-        <label for="post_id">Link to Post</label>
-        <select name="post_id" id="post_id">
-          <option value="">— not linked —</option>
-          {% for post in posts %}
-            <option value="{{ post.id }}"
-              {{ 'selected' if post.id in linked_post_ids }}>
-              {{ '✓ ' if post.id in linked_post_ids }}{{ post.title }} ({{ post.published_date }})
-            </option>
+        <label for="status">Pipeline Status</label>
+        <select name="status" id="status">
+          {% for s in ("idea", "drafted", "stress_tested", "verified", "published") %}
+            <option value="{{ s }}" {{ 'selected' if capture.status == s or (not capture.status and s == 'idea') }}>{{ s }}</option>
           {% endfor %}
         </select>
       </div>
@@ -106,6 +70,23 @@
   </div>
 
 </div>
+
+<script>
+function copyContext() {
+  const sections = document.querySelectorAll('.context-section');
+  let text = '';
+  sections.forEach(s => {
+    const label = s.querySelector('.context-label');
+    const body  = s.querySelector('.context-text');
+    if (label && body) text += label.innerText + '\n' + body.innerText.trim() + '\n\n';
+  });
+  navigator.clipboard.writeText(text.trim()).then(() => {
+    const btn = document.querySelector('.btn-copy');
+    btn.innerText = 'Copied';
+    setTimeout(() => btn.innerText = 'Copy All', 1500);
+  });
+}
+</script>
 
 <style>
   .draft-workspace {
@@ -121,6 +102,23 @@
     border-radius: 5px;
     padding: 20px 22px;
   }
+
+  .btn-copy {
+    display: block;
+    width: 100%;
+    margin-bottom: 18px;
+    padding: 8px;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    color: #555;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .btn-copy:hover { background: #eaeaea; color: #333; }
 
   .context-section {
     margin-bottom: 18px;
@@ -164,8 +162,8 @@
     padding: 24px 26px;
   }
 
-  .draft-panel textarea#full_draft {
-    min-height: 220px;
+  .draft-panel textarea {
+    min-height: 340px;
   }
 </style>
 {% endblock %}

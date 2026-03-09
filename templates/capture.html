@@ -2,7 +2,13 @@
 {% block title %}Capture Inbox{% endblock %}
 
 {% block content %}
-<h1>Capture Inbox</h1>
+<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px;">
+  <h1 style="margin-bottom:0;">Capture Inbox</h1>
+  <div>
+    <button onclick="enrichAll()" class="btn" id="enrich-all-btn">Enrich All</button>
+    <span id="enrich-progress" style="font-family:Arial;font-size:13px;color:#777;margin-left:10px;"></span>
+  </div>
+</div>
 <p class="subtitle">{{ unread_count }} unread &middot; {{ inbox|length }} total</p>
 
 <div class="form-card" style="margin-bottom: 44px;">
@@ -51,6 +57,13 @@
   <div class="capture-item {{ 'capture-item--read' if item.processed }}">
     <div class="capture-meta">
       <span class="tag tag-source">{{ item.source }}</span>
+      <form method="POST" action="{{ url_for('capture_status', idx=item.id) }}" style="display:inline;">
+        <select name="status" onchange="this.form.submit()" class="status-select status-select--{{ item.status or 'idea' }}">
+          {% for s in ("idea", "drafted", "stress_tested", "verified", "published") %}
+            <option value="{{ s }}" {{ 'selected' if item.status == s or (not item.status and s == 'idea') }}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </form>
       <span class="capture-date">{{ item.created_at[:16]|replace("T", " ") }}</span>
     </div>
     <div class="capture-content">{{ item.content }}</div>
@@ -214,6 +227,25 @@
     padding-top: 2px;
   }
 
+  .status-select {
+    font-family: Arial, sans-serif;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    padding: 2px 6px;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .status-select--idea          { background:#f0f0f0; color:#888;    border-color:#ddd; }
+  .status-select--drafted       { background:#e8f0fe; color:#1a56c4; border-color:#c5d5f5; }
+  .status-select--stress_tested { background:#fff3e0; color:#e65100; border-color:#ffd9b0; }
+  .status-select--verified      { background:#e0f4ff; color:#0277bd; border-color:#b0d9f5; }
+  .status-select--published     { background:#e8f5e9; color:#2e7d32; border-color:#b8debb; }
+
   .tag-source {
     background: #f0f4f8;
     color: #4a6fa5;
@@ -226,4 +258,28 @@
     letter-spacing: 0.5px;
   }
 </style>
+
+<script>
+function enrichAll() {
+  const btn = document.getElementById('enrich-all-btn');
+  const status = document.getElementById('enrich-progress');
+  btn.disabled = true;
+  btn.innerText = 'Working...';
+  const src = new EventSource('/capture/enrich-all');
+  src.onmessage = function(e) {
+    if (e.data === 'done') {
+      src.close();
+      window.location.reload();
+    } else {
+      status.innerText = e.data;
+    }
+  };
+  src.onerror = function() {
+    src.close();
+    status.innerText = 'Error — check server logs.';
+    btn.disabled = false;
+    btn.innerText = 'Enrich All';
+  };
+}
+</script>
 {% endblock %}

@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h1>Dashboard</h1>
+<p class="subtitle">Content engine at a glance</p>
+
+<!-- Library -->
+<div class="section">
+  <div class="section-header">
+    <h2>Library</h2>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-number">{{ pattern_count }}</div>
+      <div class="stat-label">Patterns</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">{{ story_count }}</div>
+      <div class="stat-label">Stories</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">{{ identity_count }}</div>
+      <div class="stat-label">Identity Dimensions</div>
+    </div>
+  </div>
+
+  <div class="recents">
+    {% if recent_pattern %}
+    <div class="recent-row">
+      <span class="recent-label">Latest pattern</span>
+      <span class="recent-value">{{ recent_pattern[0] }}</span>
+    </div>
+    {% endif %}
+    {% if recent_story %}
+    <div class="recent-row">
+      <span class="recent-label">Latest story</span>
+      <span class="recent-value">{{ recent_story[0] }}</span>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Capture Inbox -->
+<div class="section">
+  <div class="section-header">
+    <h2>Capture Inbox</h2>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-number">{{ total_captures }}</div>
+      <div class="stat-label">Total</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">{{ unread_count }}</div>
+      <div class="stat-label">Unread</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">{{ enriched_count }}</div>
+      <div class="stat-label">Enriched</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">{{ draft_count }}</div>
+      <div class="stat-label">Drafted</div>
+    </div>
+  </div>
+
+  <div class="breakdown-row">
+    <div class="breakdown">
+      <div class="breakdown-title">By Category</div>
+      {% for cat, count in by_category %}
+      <div class="breakdown-item">
+        <span class="breakdown-key">{{ cat }}</span>
+        <span class="breakdown-val">{{ count }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="breakdown">
+      <div class="breakdown-title">By Status</div>
+      {% for status, count in by_status %}
+      <div class="breakdown-item">
+        <span class="breakdown-key">{{ status }}</span>
+        <span class="breakdown-val">{{ count }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Posts Performance -->
+<div class="section">
+  <div class="section-header">
+    <h2>Posts Performance</h2>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-number">{{ total_posts }}</div>
+      <div class="stat-label">Posts Published</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">{{ "{:,}".format(total_impressions) }}</div>
+      <div class="stat-label">Total Impressions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">{{ "{:,}".format(avg_impressions) }}</div>
+      <div class="stat-label">Avg Impressions</div>
+    </div>
+  </div>
+
+  {% if best_post %}
+  <div class="best-post">
+    <span class="best-label">Best performer</span>
+    <span class="best-hook">"{{ best_post[0] }}"</span>
+    <span class="best-impressions">{{ "{:,}".format(best_post[2]) }} impressions</span>
+  </div>
+  {% endif %}
+
+  <table class="log-table" style="margin-top:20px;">
+    <thead>
+      <tr>
+        <th>Hook</th>
+        <th>Date</th>
+        <th style="text-align:right;">Impressions</th>
+        <th style="text-align:right;">Reactions</th>
+        <th style="text-align:right;">Comments</th>
+        <th style="text-align:right;">Reposts</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for post in posts %}
+      <tr>
+        <td>{{ post.hook or post.title }}</td>
+        <td>{{ post.published_date }}</td>
+        <td style="text-align:right;">{{ "{:,}".format(post.impressions or 0) }}</td>
+        <td style="text-align:right;">{{ post.reactions or 0 }}</td>
+        <td style="text-align:right;">{{ post.comments or 0 }}</td>
+        <td style="text-align:right;">{{ post.reposts or 0 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<style>
+  .stat-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .stat-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+    padding: 20px 28px;
+    min-width: 120px;
+    text-align: center;
+  }
+
+  .stat-number {
+    font-size: 32px;
+    font-weight: bold;
+    color: #1a1a2e;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .stat-label {
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .recents {
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+  }
+
+  .recent-row {
+    display: flex;
+    gap: 16px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .recent-row:last-child { border-bottom: none; }
+
+  .recent-label {
+    color: #aaa;
+    min-width: 130px;
+    font-size: 13px;
+  }
+
+  .recent-value { color: #1a1a2e; }
+
+  .breakdown-row {
+    display: flex;
+    gap: 40px;
+  }
+
+  .breakdown {
+    min-width: 200px;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+  }
+
+  .breakdown-title {
+    font-weight: bold;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #aaa;
+    margin-bottom: 10px;
+  }
+
+  .breakdown-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid #f0f0f0;
+    color: #444;
+  }
+
+  .breakdown-item:last-child { border-bottom: none; }
+
+  .breakdown-key { color: #555; }
+  .breakdown-val { font-weight: bold; color: #1a1a2e; }
+
+  .best-post {
+    background: #f8f8f4;
+    border: 1px solid #e8e8e0;
+    border-left: 3px solid #1a1a2e;
+    border-radius: 4px;
+    padding: 14px 18px;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .best-label {
+    color: #aaa;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    font-weight: bold;
+  }
+
+  .best-hook {
+    color: #1a1a2e;
+    font-style: italic;
+    flex: 1;
+  }
+
+  .best-impressions {
+    font-weight: bold;
+    color: #2c5f8a;
+    white-space: nowrap;
+  }
+</style>
+{% endblock %}
